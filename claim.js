@@ -1,5 +1,3 @@
-// claim.js
-
 const fs = require('fs');
 const fetch = require('node-fetch').default; // Corrected import for node-fetch
 const { ethers } = require('ethers');
@@ -186,16 +184,22 @@ async function sendDailyTask(wallet) {
     }
 }
 
-// Start bot processing wallets
+// Process 50 wallets concurrently
 async function startBot() {
     const privateKeys = JSON.parse(fs.readFileSync("privateKeys.json"));
+    const wallets = privateKeys.map(privateKey => new ethers.Wallet(privateKey));
+
     fs.writeFileSync(logFile, "");
     header();
-    for (const privateKey of privateKeys) {
-        const wallet = new ethers.Wallet(privateKey);
+
+    const taskPromises = wallets.slice(0, 50).map(wallet => {
         log(wallet.address, `🔹 Processing wallet: ${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`);
-        await sendDailyTask(wallet);
-    }
+        return sendDailyTask(wallet);
+    });
+
+    // Wait for all wallet tasks to finish
+    await Promise.all(taskPromises);
+    log("", "✅ All tasks completed for 50 wallets.");
 }
 
 startBot();
