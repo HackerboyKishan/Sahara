@@ -79,12 +79,11 @@ async function sendTransaction(privateKey) {
     }
 }
 
-// Run transaction for a single wallet using the private key
+// Run transactions for multiple wallets simultaneously (100 wallets)
 async function runTransaction() {
     const PRIVATE_KEYS = JSON.parse(fs.readFileSync('privateKeys.json', 'utf-8'));
 
-    // Process each private key once (only one transaction per private key)
-    for (const [index, privateKey] of PRIVATE_KEYS.entries()) {
+    const promises = PRIVATE_KEYS.slice(0, 100).map(async (privateKey, index) => {
         try {
             await sendTransaction(privateKey);
             console.log('');
@@ -94,7 +93,10 @@ async function runTransaction() {
             console.log(kleur.red(errorMessage));
             appendLog(errorMessage);
         }
-    }
+    });
+
+    // Wait for all transactions to finish
+    await Promise.all(promises);
 }
 
 // Time logging function
