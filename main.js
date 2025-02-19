@@ -52,9 +52,13 @@ async function sendTransaction(privateKey) {
     // Display loading
     console.log(`Start Transaction for Wallet ${wallet.address}...`);
 
+    // Get the current nonce
+    const nonce = await provider().getTransactionCount(wallet.address);
+
     const tx = {
         to: wallet.address,
         value: ethers.parseEther(getRandomTransactionValue().toFixed(8)),  // Randomized ETH value
+        nonce: nonce,  // Set the correct nonce
     };
 
     try {
