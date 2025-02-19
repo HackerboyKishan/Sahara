@@ -1,25 +1,38 @@
-const chains = require('./chains');
+// claim.js
+
 const fs = require('fs');
 const fetch = require('node-fetch');
 const { ethers } = require('ethers');
-const header = chains.utils.etc.header;
-const privateKeys = JSON.parse(fs.readFileSync("privateKeys.json"));
-const delay = chains.utils.etc.delay;
+
+// Utility functions (replacing chains.js)
+const header = function() {
+    console.log("Sahara Bot Initialized.");
+};
+
+const delay = function(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+};
+
 const maskedAddress = (address) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-const logFile = "log.txt"; 
+const logFile = "log.txt";
+
+// Logging function for both console and file
 function logToFile(message) {
     fs.appendFileSync(logFile, message + "\n", "utf8");
 }
-function log(address, message) {
-  const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19);
-  const logMessage = address 
-      ? `[${timestamp} | ${maskedAddress(address)}] ${message}`
-      : ""; // Tambahkan baris kosong
 
-  console.log(logMessage);
-  logToFile(logMessage);
+function log(address, message) {
+    const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const logMessage = address 
+        ? `[${timestamp} | ${maskedAddress(address)}] ${message}`
+        : ""; // Add a blank line
+
+    console.log(logMessage);
+    logToFile(logMessage);
 }
+
+// Request the challenge
 async function getChallenge(address) {
     log(address, "🔹 Requesting challenge...");
     await delay(5000);
@@ -39,6 +52,7 @@ async function getChallenge(address) {
     return data.challenge;
 }
 
+// Sign the challenge with the wallet
 async function signChallenge(wallet) {
     try {
         const address = wallet.address;
@@ -91,6 +105,7 @@ async function signChallenge(wallet) {
     }
 }
 
+// Send request for Task ID
 async function sendTaskRequest(accessToken, taskID, address) {
     log(address, `🔹 Sending request for Task ${taskID}...`);
     await delay(5000);
@@ -104,6 +119,7 @@ async function sendTaskRequest(accessToken, taskID, address) {
     log(address, `✅ Task ${taskID} - Request successfully sent.`);
 }
 
+// Claim Task ID
 async function sendTaskClaim(accessToken, taskID, address) {
     log(address, `🔹 Claiming Task ${taskID}...`);
     await delay(5000);
@@ -117,6 +133,7 @@ async function sendTaskClaim(accessToken, taskID, address) {
     log(address, `✅ Task ${taskID} - Successfully claimed.`);
 }
 
+// Check Task status and handle accordingly
 async function sendCheckTask(accessToken, taskID, address) {
     log(address, `🔹 Checking Task ${taskID} status...`);
     await delay(5000);
@@ -151,6 +168,7 @@ async function sendCheckTask(accessToken, taskID, address) {
     }
 }
 
+// Main daily task logic
 async function sendDailyTask(wallet) {
     try {
         const { accessToken } = await signChallenge(wallet);
@@ -170,7 +188,9 @@ async function sendDailyTask(wallet) {
     }
 }
 
+// Start bot processing wallets
 async function startBot() {
+    const privateKeys = JSON.parse(fs.readFileSync("privateKeys.json"));
     fs.writeFileSync(logFile, "");
     header();
     for (const privateKey of privateKeys) {
