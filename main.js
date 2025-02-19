@@ -45,6 +45,11 @@ function getRandomTransactionValue() {
   return Math.random() * (max - min) + min;
 }
 
+// Function to add delay between transactions
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Single transaction for each private key
 async function sendTransaction(privateKey) {
     const wallet = new ethers.Wallet(privateKey, provider());
@@ -52,8 +57,8 @@ async function sendTransaction(privateKey) {
     // Display loading
     console.log(`Start Transaction for Wallet ${wallet.address}...`);
 
-    // Get the current nonce
-    const nonce = await provider().getTransactionCount(wallet.address);
+    // Get the current nonce before sending the transaction (to avoid mismatch)
+    const nonce = await provider().getTransactionCount(wallet.address, 'latest');  // Use 'latest' to ensure the correct nonce
 
     const tx = {
         to: wallet.address,
@@ -83,6 +88,7 @@ async function runTransaction() {
         try {
             await sendTransaction(privateKey);
             console.log('');
+            await delay(2000);  // Delay 2 seconds between transactions to prevent nonce issues
         } catch (error) {
             const errorMessage = `[${timelog()}] Error processing wallet ${index + 1}: ${error.message}`;
             console.log(kleur.red(errorMessage));
