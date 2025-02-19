@@ -4,20 +4,20 @@ const kleur = require("kleur");
 const fs = require('fs');
 const moment = require('moment-timezone');
 
-// RPC Providers
-const rpcProviders = [  
-  new JsonRpcProvider('https://testnet.saharalabs.ai'), 
-];
+// Import the chains configuration
+const { rpcProviders } = require('./chains');
 
 let currentRpcProviderIndex = 0;
 
-function provider() {  
-  return rpcProviders[currentRpcProviderIndex];  
+// Function to get the current RPC provider
+function provider() {
+  return new JsonRpcProvider(rpcProviders[currentRpcProviderIndex].url);
 }
 
-function rotateRpcProvider() {  
-  currentRpcProviderIndex = (currentRpcProviderIndex + 1) % rpcProviders.length;  
-  return provider();  
+// Function to rotate RPC providers
+function rotateRpcProvider() {
+  currentRpcProviderIndex = (currentRpcProviderIndex + 1) % rpcProviders.length;
+  return provider();
 }
 
 // Explorer base URL
@@ -50,56 +50,62 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Single transaction for each private key
-async function sendTransaction(privateKey) {
-    const wallet = new ethers.Wallet(privateKey, provider());
-    
-    // Display loading
-    console.log(`Start Transaction for Wallet ${wallet.address}...`);
+// Smart contract address and ABI for shard claiming
+const contractAddress = '0xYourContractAddress';  // Replace with the correct contract address
+const contractABI = [
+  "function claimShards() public returns (bool)"  // Adjust the ABI based on your contract
+];
 
-    // Get the current nonce before sending the transaction (to avoid mismatch)
-    const nonce = await provider().getTransactionCount(wallet.address, 'latest');  // Use 'latest' to ensure the correct nonce
-
-    const tx = {
-        to: wallet.address,
-        value: ethers.parseEther(getRandomTransactionValue().toFixed(8)),  // Randomized ETH value
-        nonce: nonce,  // Set the correct nonce
-    };
-
-    try {
-        const signedTx = await wallet.sendTransaction(tx);
-        const receipt = await signedTx.wait();
-        const successMessage = `[${timelog()}] Transaction Confirmed: ${explorer.tx(receipt.hash)}`;
-        console.log(kleur.green(successMessage));
-        appendLog(successMessage);
-    } catch (error) {
-        const errorMessage = `[${timelog()}] Error processing wallet: ${error.message}`;
-        console.log(kleur.red(errorMessage));
-        appendLog(errorMessage);
-    }
+// Function to claim shards using the contract
+async function claimShards(wallet) {
+  const contract = new ethers.Contract(contractAddress, contractABI, wallet);
+  try {
+    // Call the contract function to claim shards
+    const tx = await contract.claimShards();
+    const receipt = await tx.wait();
+    const successMessage = `[${timelog()}] Shard Claim Confirmed: ${explorer.tx(receipt.transactionHash)}`;
+    console.log(kleur.green(successMessage));
+    appendLog(successMessage);
+  } catch (error) {
+    const errorMessage = `[${timelog()}] Error claiming shards: ${error.message}`;
+    console.log(kleur.red(errorMessage));
+    appendLog(errorMessage);
+  }
 }
 
-// Run transaction for a single wallet using the private key
-async function runTransaction() {
-    const PRIVATE_KEYS = JSON.parse(fs.readFileSync('privateKeys.json', 'utf-8'));
+// Function to send a transaction for each private key
+async function sendTransaction(privateKey) {
+  const wallet = new ethers.Wallet(privateKey, provider());
+  console.log(`Start Transaction for Wallet ${wallet.address}...`);
 
-    // Process each private key once (only one transaction per private key)
-    for (const [index, privateKey] of PRIVATE_KEYS.entries()) {
-        try {
-            await sendTransaction(privateKey);
-            console.log('');
-            await delay(2000);  // Delay 2 seconds between transactions to prevent nonce issues
-        } catch (error) {
-            const errorMessage = `[${timelog()}] Error processing wallet ${index + 1}: ${error.message}`;
-            console.log(kleur.red(errorMessage));
-            appendLog(errorMessage);
-        }
-    }
+  // Get the current nonce before sending the transaction
+  const nonce = await provider().getTransactionCount(wallet.address, 'latest');  // Use 'latest' to ensure the correct nonce
+
+  // Call claimShards instead of sending ETH
+  await claimShards(wallet);
 }
 
 // Time logging function
 function timelog() {
   return moment().tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss');
+}
+
+// Run transaction for a single wallet using the private key
+async function runTransaction() {
+  const PRIVATE_KEYS = JSON.parse(fs.readFileSync('privateKeys.json', 'utf-8'));
+
+  // Process each private key once (only one transaction per private key)
+  for (const [index, privateKey] of PRIVATE_KEYS.entries()) {
+    try {
+      await sendTransaction(privateKey);
+      console.log('');
+      await delay(2000);  // Delay 2 seconds between transactions to prevent nonce issues
+    } catch (error) {
+      const errorMessage = `[${timelog()}] Error processing wallet ${index + 1}: ${error.message}`;
+      console.log(kleur.red(errorMessage));
+      appendLog(errorMessage);
+    }
+  }
 }
 
 // Run the main transaction loop
