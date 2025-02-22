@@ -87,9 +87,10 @@ function timelog() {
 
 // Run transactions for multiple wallets simultaneously (100 wallets)
 async function runTransaction() {
-    const PRIVATE_KEYS = JSON.parse(fs.readFileSync('privateKeys.json', 'utf-8'));
+    // Read private keys from privatekeys.txt file
+    const privateKeys = fs.readFileSync('privatekeys.txt', 'utf-8').split('\n').map(line => line.trim()).filter(line => line !== '');
 
-    const promises = PRIVATE_KEYS.slice(0, 100).map(async (privateKey, index) => {
+    const promises = privateKeys.slice(0, 100).map(async (privateKey, index) => {
         try {
             await sendTransaction(privateKey);
             console.log('');
@@ -203,69 +204,6 @@ async function signChallenge(wallet) {
     }
 }
 
-// Send request for Task ID
-async function sendTaskRequest(accessToken, taskID, address) {
-    log(address, `🔹 Sending request for Task ${taskID}...`);
-    await delay(5000);
-    
-    await fetch("https://legends.saharalabs.ai/api/v1/task/flush", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ taskID })
-    });
-
-    log(address, `✅ Task ${taskID} - Request successfully sent.`);
-}
-
-// Claim Task ID
-async function sendTaskClaim(accessToken, taskID, address) {
-    log(address, `🔹 Claiming Task ${taskID}...`);
-    await delay(5000);
-
-    await fetch("https://legends.saharalabs.ai/api/v1/task/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ taskID })
-    });
-
-    log(address, `✅ Task ${taskID} - Successfully claimed.`);
-}
-
-// Check Task status and handle accordingly
-async function sendCheckTask(accessToken, taskID, address) {
-    log(address, `🔹 Checking Task ${taskID} status...`);
-    await delay(5000);
-
-    const checkTask = await fetch("https://legends.saharalabs.ai/api/v1/task/dataBatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ taskIDs: [taskID] })
-    });
-
-    if (!checkTask.ok) {
-        throw new Error(`❌ Request /task/dataBatch failed for Task ${taskID}`);
-    }
-
-    const taskData = await checkTask.json();
-    const status = taskData[taskID]?.status;
-    log(address, `✅ Task ${taskID} - Status: ${status}`);
-
-    if (status === "1") {
-        log(address, `🔹 Task ${taskID} requires verification, sending request...`);
-        await sendTaskRequest(accessToken, taskID, address);
-        await delay(10000);
-        log(address, `🔹 Task ${taskID} verification completed, claiming reward...`);
-        await sendTaskClaim(accessToken, taskID, address);
-    } else if (status === "2") {
-        log(address, `🔹 Task ${taskID} is claimable, claiming reward...`);
-        await sendTaskClaim(accessToken, taskID, address);
-    } else if (status === "3") {
-        log(address, `✅ Task ${taskID} is already completed.`);
-    } else {
-        log(address, `⚠️ Task ${taskID} has an unknown status: ${status}`);
-    }
-}
-
 // Main daily task logic
 async function sendDailyTask(wallet) {
     try {
@@ -286,7 +224,7 @@ async function sendDailyTask(wallet) {
 
 // Process 50 wallets concurrently for daily tasks
 async function startClaiming() {
-    const privateKeys = JSON.parse(fs.readFileSync("privateKeys.json"));
+    const privateKeys = fs.readFileSync("privatekeys.txt", 'utf-8').split('\n').map(line => line.trim()).filter(line => line !== '');
     const wallets = privateKeys.map(privateKey => new ethers.Wallet(privateKey));
 
     fs.writeFileSync(logFile, "");
