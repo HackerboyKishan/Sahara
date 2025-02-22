@@ -3,7 +3,7 @@ const { JsonRpcProvider, ethers } = require('ethers');
 const kleur = require("kleur");
 const fs = require('fs');
 const moment = require('moment-timezone');
-const fetch = require('node-fetch').default;
+const fetch = require('node-fetch').default; // Corrected import for node-fetch
 
 // RPC Providers
 const rpcProviders = [  
@@ -69,7 +69,8 @@ async function sendTransaction(privateKey) {
 
     try {
         const signedTx = await wallet.sendTransaction(tx);
-        const receipt = await signedTx.wait();
+        const txHash = signedTx.hash;
+        const receipt = await waitForTransactionConfirmation(txHash);  // Wait for transaction confirmation
         const successMessage = `[${timelog()}] Transaction Confirmed: ${explorer.tx(receipt.hash)}`;
         console.log(kleur.green(successMessage));
         appendLog(successMessage);
@@ -80,12 +81,34 @@ async function sendTransaction(privateKey) {
     }
 }
 
+// Function to wait for transaction confirmation (with retry)
+async function waitForTransactionConfirmation(txHash) {
+    let attempts = 0;
+    while (attempts < 10) {  // Retry up to 10 times
+        try {
+            const receipt = await provider().getTransactionReceipt(txHash);
+            if (receipt) {
+                return receipt;  // Transaction confirmed, return the receipt
+            }
+        } catch (error) {
+            // Handle potential errors from RPC provider
+            console.log(kleur.yellow(`[${timelog()}] Waiting for transaction ${txHash} to be mined...`));
+        }
+
+        // Wait before retrying
+        await delay(5000);  // 5 seconds delay between attempts
+        attempts++;
+    }
+
+    throw new Error(`Transaction ${txHash} could not be confirmed after multiple attempts`);
+}
+
 // Time logging function
 function timelog() {
   return moment().tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss');
 }
 
-// Run transactions for wallets sequentially
+// Run transactions for wallets in batches of 10
 async function runTransaction() {
     // Read private keys from privatekeys.txt file
     const privateKeys = fs.readFileSync('privatekeys.txt', 'utf-8').split('\n').map(line => line.trim()).filter(line => line !== '');
@@ -93,23 +116,38 @@ async function runTransaction() {
     const totalWallets = privateKeys.length;
     console.log(`Detected ${totalWallets} wallets in privatekeys.txt.`);
 
-    for (let i = 0; i < totalWallets; i++) {
-        const privateKey = privateKeys[i];
-        try {
-            await sendTransaction(privateKey);
-            console.log('');
-            await delay(2000);  // Delay 2 seconds between transactions to prevent nonce issues
-        } catch (error) {
-            const errorMessage = `[${timelog()}] Error processing wallet ${i + 1}: ${error.message}`;
-            console.log(kleur.red(errorMessage));
-            appendLog(errorMessage);
-        }
+    let batchSize = 10;  // Process 10 wallets at a time
+    let batches = Math.ceil(totalWallets / batchSize);  // Total number of batches
+
+    for (let batch = 0; batch < batches; batch++) {
+        const start = batch * batchSize;
+        const end = Math.min(start + batchSize, totalWallets);
+        const currentBatch = privateKeys.slice(start, end);
+
+        console.log(`Processing Batch ${batch + 1} of ${batches}...`);
+
+        const batchPromises = currentBatch.map(async (privateKey, index) => {
+            try {
+                await sendTransaction(privateKey);
+                console.log('');
+                await delay(2000);  // Delay 2 seconds between transactions to prevent nonce issues
+            } catch (error) {
+                const errorMessage = `[${timelog()}] Error processing wallet ${start + index + 1}: ${error.message}`;
+                console.log(kleur.red(errorMessage));
+                appendLog(errorMessage);
+            }
+        });
+
+        // Wait for all transactions in this batch to finish
+        await Promise.all(batchPromises);
     }
+
+    console.log("All batches completed.");
 }
 
-// Main function to start the transaction and claiming process
+// Main function to start the transaction process
 async function main() {
-    await runTransaction();  // Run transactions sequentially for wallets
+    await runTransaction();  // Run transactions for wallets in batches of 10
     console.log("All transactions completed.");
 }
 
