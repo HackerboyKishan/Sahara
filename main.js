@@ -3,7 +3,7 @@ const { JsonRpcProvider, ethers } = require('ethers');
 const kleur = require("kleur");
 const fs = require('fs');
 const moment = require('moment-timezone');
-const fetch = require('node-fetch').default; // Corrected import for node-fetch
+const fetch = require('node-fetch').default;
 
 // RPC Providers
 const rpcProviders = [  
@@ -18,7 +18,7 @@ function provider() {
 
 function rotateRpcProvider() {  
   currentRpcProviderIndex = (currentRpcProviderIndex + 1) % rpcProviders.length;  
-  return provider();  
+  return provider(); 
 }
 
 // Explorer base URL
@@ -85,165 +85,32 @@ function timelog() {
   return moment().tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss');
 }
 
-// Run transactions for multiple wallets simultaneously (100 wallets)
+// Run transactions for wallets sequentially
 async function runTransaction() {
     // Read private keys from privatekeys.txt file
     const privateKeys = fs.readFileSync('privatekeys.txt', 'utf-8').split('\n').map(line => line.trim()).filter(line => line !== '');
 
-    const promises = privateKeys.slice(0, 100).map(async (privateKey, index) => {
+    const totalWallets = privateKeys.length;
+    console.log(`Detected ${totalWallets} wallets in privatekeys.txt.`);
+
+    for (let i = 0; i < totalWallets; i++) {
+        const privateKey = privateKeys[i];
         try {
             await sendTransaction(privateKey);
             console.log('');
             await delay(2000);  // Delay 2 seconds between transactions to prevent nonce issues
         } catch (error) {
-            const errorMessage = `[${timelog()}] Error processing wallet ${index + 1}: ${error.message}`;
+            const errorMessage = `[${timelog()}] Error processing wallet ${i + 1}: ${error.message}`;
             console.log(kleur.red(errorMessage));
             appendLog(errorMessage);
         }
-    });
-
-    // Wait for all transactions to finish
-    await Promise.all(promises);
-}
-
-// Claim.js logic
-const header = function() {
-    console.log("Sahara Bot Initialized.");
-};
-
-const logFile = "log.txt";
-
-// Logging function for both console and file
-function logToFile(message) {
-    fs.appendFileSync(logFile, message + "\n", "utf8");
-}
-
-function log(address, message) {
-    const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19);
-    const logMessage = address 
-        ? `[${timestamp} | ${maskedAddress(address)}] ${message}`
-        : ""; // Add a blank line
-
-    console.log(logMessage);
-    logToFile(logMessage);
-}
-
-// Utility function for masked address
-const maskedAddress = (address) => `${address.slice(0, 6)}...${address.slice(-4)}`;
-
-// Request the challenge
-async function getChallenge(address) {
-    log(address, "🔹 Requesting challenge...");
-    await delay(5000);
-
-    const response = await fetch("https://legends.saharalabs.ai/api/v1/user/challenge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address })
-    });
-
-    if (!response.ok) {
-        throw new Error(`❌ Failed to get challenge: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    log(address, `✅ Challenge received: ${data.challenge}`);
-    return data.challenge;
-}
-
-// Sign the challenge with the wallet
-async function signChallenge(wallet) {
-    try {
-        const address = wallet.address;
-        const challenge = await getChallenge(address);
-        const message = `Sign in to Sahara!\nChallenge:${challenge}`;
-        const signature = await wallet.signMessage(message);
-
-        log(address, `✅ Signature: ${signature.slice(0, 6)}...${signature.slice(-4)}`);
-
-        log(address, "🔹 Submitting signature for login...");
-        await delay(5000);
-        const loginResponse = await fetch("https://legends.saharalabs.ai/api/v1/login/wallet", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "accept": "application/json",
-                "authorization": "Bearer null",
-                "origin": "https://legends.saharalabs.ai",
-                "referer": "https://legends.saharalabs.ai/?code=THWD0T",
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
-            },
-            body: JSON.stringify({
-                address,
-                sig: signature,
-                referralCode: "THWD0T",
-                walletUUID: "",
-                walletName: "MetaMask"
-            })
-        });
-
-        if (!loginResponse.ok) {
-            throw new Error(`❌ Login failed: ${loginResponse.statusText}`);
-        }
-
-        const loginData = await loginResponse.json();
-        const maskedToken = loginData.accessToken
-            ? `${loginData.accessToken.slice(0, 6)}***${loginData.accessToken.slice(-4)}`
-            : "Token not found";
-
-        log(address, `✅ Login successful! Access Token: ${maskedToken}`);
-
-        if (!loginData.accessToken) {
-            throw new Error(`❌ Failed to retrieve accessToken`);
-        }
-
-        return { accessToken: loginData.accessToken };
-    } catch (error) {
-        log(wallet.address, `❌ Error during login: ${error.message}`);
-        throw error;
     }
 }
 
-// Main daily task logic
-async function sendDailyTask(wallet) {
-    try {
-        const { accessToken } = await signChallenge(wallet);
-        if (!accessToken) {
-            throw new Error(`❌ Access token not found!`);
-        }
-
-        const taskID = "1004";  // Only process Task 1004
-        await sendCheckTask(accessToken, taskID, wallet.address);
-
-        log(wallet.address, "✅ Task 1004 completed.");
-        log("", "");
-    } catch (error) {
-        log(wallet.address, `❌ Error: ${error.message}`);
-    }
-}
-
-// Process 50 wallets concurrently for daily tasks
-async function startClaiming() {
-    const privateKeys = fs.readFileSync("privatekeys.txt", 'utf-8').split('\n').map(line => line.trim()).filter(line => line !== '');
-    const wallets = privateKeys.map(privateKey => new ethers.Wallet(privateKey));
-
-    fs.writeFileSync(logFile, "");
-    header();
-
-    const taskPromises = wallets.slice(0, 50).map(wallet => {
-        log(wallet.address, `🔹 Processing wallet: ${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`);
-        return sendDailyTask(wallet);
-    });
-
-    // Wait for all wallet tasks to finish
-    await Promise.all(taskPromises);
-    log("", "✅ All tasks completed for 50 wallets.");
-}
-
-// Main entry point for the combined process
+// Main function to start the transaction and claiming process
 async function main() {
-    await runTransaction();  // First run transactions for wallets
-    await startClaiming();   // After successful transactions, run claiming
+    await runTransaction();  // Run transactions sequentially for wallets
+    console.log("All transactions completed.");
 }
 
 main();
