@@ -116,7 +116,7 @@ async function runTransaction() {
     const totalWallets = privateKeys.length;
     console.log(`Detected ${totalWallets} wallets in privatekeys.txt.`);
 
-    let batchSize = 10;  // Process 10 wallets at a time
+    let batchSize = 100;  // Process 10 wallets at a time
     let batches = Math.ceil(totalWallets / batchSize);  // Total number of batches
 
     for (let batch = 0; batch < batches; batch++) {
