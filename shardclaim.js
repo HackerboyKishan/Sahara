@@ -187,12 +187,13 @@ async function sendDailyTask(wallet) {
     }
 }
 
-// Function to start the bot and process the wallets
+// Function to start the bot and process the wallets from privateKeys.txt
 async function startBot() {
     fs.writeFileSync(logFile, "");
     header();
 
-    const privateKeys = JSON.parse(fs.readFileSync("privateKeys.json"));
+    // Read private keys from 'privateKeys.txt'
+    const privateKeys = fs.readFileSync('privateKeys.txt', 'utf8').split('\n').map(key => key.trim()).filter(key => key.length > 0);
     const provider = new ethers.JsonRpcProvider("https://testnet.saharalabs.ai");
 
     for (const privateKey of privateKeys) {
