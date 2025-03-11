@@ -8,9 +8,14 @@ const delay = chains.utils.etc.delay;
 const maskedAddress = (address) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
 const logFile = "log.txt"; 
+
+// Initialize custom provider using the testnet RPC
+const provider = new ethers.JsonRpcProvider("https://testnet.saharalabs.ai");
+
 function logToFile(message) {
     fs.appendFileSync(logFile, message + "\n", "utf8");
 }
+
 function log(address, message) {
   const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19);
   const logMessage = address 
@@ -20,6 +25,7 @@ function log(address, message) {
   console.log(logMessage);
   logToFile(logMessage);
 }
+
 async function getChallenge(address) {
     log(address, "🔹 Requesting challenge...");
     await delay(5000);
@@ -174,7 +180,7 @@ async function startBot() {
     fs.writeFileSync(logFile, "");
     header();
     for (const privateKey of privateKeys) {
-        const wallet = new ethers.Wallet(privateKey);
+        const wallet = new ethers.Wallet(privateKey, provider);  // Use custom provider
         log(wallet.address, `🔹 Processing wallet: ${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`);
         await sendDailyTask(wallet);
     }
