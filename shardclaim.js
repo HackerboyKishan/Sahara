@@ -1,21 +1,18 @@
-const chains = require('./chains');
 const fs = require('fs');
 const fetch = require('node-fetch');
 const { ethers } = require('ethers');
-const header = chains.utils.etc.header;
-const privateKeys = JSON.parse(fs.readFileSync("privateKeys.json"));
-const delay = chains.utils.etc.delay;
+
+// Function to mask address
 const maskedAddress = (address) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-const logFile = "log.txt"; 
+const logFile = "log.txt";
 
-// Initialize custom provider using the testnet RPC
-const provider = new ethers.JsonRpcProvider("https://testnet.saharalabs.ai");
-
+// Utility function to log to file
 function logToFile(message) {
     fs.appendFileSync(logFile, message + "\n", "utf8");
 }
 
+// Log function for console and file
 function log(address, message) {
   const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19);
   const logMessage = address 
@@ -26,6 +23,15 @@ function log(address, message) {
   logToFile(logMessage);
 }
 
+// Simulate a delay function
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Print header when the bot starts
+function header() {
+    console.log("Sahara Task Bot Initialized.");
+}
+
+// Function to fetch a challenge
 async function getChallenge(address) {
     log(address, "🔹 Requesting challenge...");
     await delay(5000);
@@ -45,6 +51,7 @@ async function getChallenge(address) {
     return data.challenge;
 }
 
+// Function to sign the challenge message
 async function signChallenge(wallet) {
     try {
         const address = wallet.address;
@@ -98,6 +105,7 @@ async function signChallenge(wallet) {
     }
 }
 
+// Function to send a task request
 async function sendTaskRequest(accessToken, taskID, address) {
     log(address, `🔹 Sending request for Task ${taskID}...`);
     await delay(5000);
@@ -111,6 +119,7 @@ async function sendTaskRequest(accessToken, taskID, address) {
     log(address, `✅ Task ${taskID} - Request successfully sent.`);
 }
 
+// Function to claim the task reward
 async function sendTaskClaim(accessToken, taskID, address) {
     log(address, `🔹 Claiming Task ${taskID}...`);
     await delay(5000);
@@ -124,6 +133,7 @@ async function sendTaskClaim(accessToken, taskID, address) {
     log(address, `✅ Task ${taskID} - Successfully claimed.`);
 }
 
+// Function to check task status
 async function sendCheckTask(accessToken, taskID, address) {
     log(address, `🔹 Checking Task ${taskID} status...`);
     await delay(5000);
@@ -158,6 +168,7 @@ async function sendCheckTask(accessToken, taskID, address) {
     }
 }
 
+// Main function to send daily task
 async function sendDailyTask(wallet) {
     try {
         const { accessToken } = await signChallenge(wallet);
@@ -176,9 +187,14 @@ async function sendDailyTask(wallet) {
     }
 }
 
+// Function to start the bot and process the wallets
 async function startBot() {
     fs.writeFileSync(logFile, "");
     header();
+
+    const privateKeys = JSON.parse(fs.readFileSync("privateKeys.json"));
+    const provider = new ethers.JsonRpcProvider("https://testnet.saharalabs.ai");
+
     for (const privateKey of privateKeys) {
         const wallet = new ethers.Wallet(privateKey, provider);  // Use custom provider
         log(wallet.address, `🔹 Processing wallet: ${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`);
@@ -186,4 +202,5 @@ async function startBot() {
     }
 }
 
+// Start the bot
 startBot();
