@@ -1,5 +1,5 @@
 const fs = require('fs');
-const fetch = require('node-fetch');
+const fetch = require('node-fetch');  // Ensure node-fetch is imported correctly
 const { ethers, JsonRpcProvider } = require('ethers');
 const axios = require('axios');
 const moment = require('moment-timezone');
@@ -115,86 +115,6 @@ async function signChallenge(wallet) {
     }
 }
 
-// Functions to handle task actions
-async function sendTaskRequest(accessToken, taskID, address) {
-    log(address, `🔹 Sending request for Task ${taskID}...`);
-    await delay(5000);
-    
-    await fetch("https://legends.saharalabs.ai/api/v1/task/flush", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ taskID, timestamp: Date.now() })
-    });
-
-    log(address, `✅ Task ${taskID} - Request successfully sent.`);
-}
-
-async function sendTaskClaim(accessToken, taskID, address) {
-    log(address, `🔹 Claiming Task ${taskID}...`);
-    await delay(5000);
-
-    await fetch("https://legends.saharalabs.ai/api/v1/task/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ taskID, timestamp: Date.now() })
-    });
-
-    log(address, `✅ Task ${taskID} - Successfully claimed.`);
-}
-
-async function sendCheckTask(accessToken, taskID, address) {
-    log(address, `🔹 Checking Task ${taskID} status...`);
-    await delay(5000);
-
-    const checkTask = await fetch("https://legends.saharalabs.ai/api/v1/task/dataBatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ taskIDs: [taskID], timestamp: Date.now() })
-    });
-
-    if (!checkTask.ok) {
-        throw new Error(`❌ Request /task/dataBatch failed for Task ${taskID}`);
-    }
-
-    const taskData = await checkTask.json();
-    const status = taskData[taskID]?.status;
-    log(address, `✅ Task ${taskID} - Status: ${status}`);
-
-    if (status === "1") {
-        log(address, `🔹 Task ${taskID} requires verification, sending request...`);
-        await sendTaskRequest(accessToken, taskID, address);
-        await delay(10000);
-        log(address, `🔹 Task ${taskID} verification completed, claiming reward...`);
-        await sendTaskClaim(accessToken, taskID, address);
-    } else if (status === "2") {
-        log(address, `🔹 Task ${taskID} is claimable, claiming reward...`);
-        await sendTaskClaim(accessToken, taskID, address);
-    } else if (status === "3") {
-        log(address, `✅ Task ${taskID} is already completed.`);
-    } else {
-        log(address, `⚠️ Task ${taskID} has an unknown status: ${status}`);
-    }
-}
-
-// Function to send daily task
-async function sendDailyTask(wallet) {
-    try {
-        const { accessToken } = await signChallenge(wallet);
-        if (!accessToken) {
-            throw new Error(`❌ Access token not found!`);
-        }
-
-        const taskIDs = ["1001", "1002", "1004"];
-        for (const taskID of taskIDs) {
-            await sendCheckTask(accessToken, taskID, wallet.address);
-        }
-        log(wallet.address, "✅ All tasks completed.");
-        log("", "");
-    } catch (error) {
-        log(wallet.address, `❌ Error: ${error.message}`);
-    }
-}
-
 // Main bot loop
 async function startBot() {
     fs.writeFileSync(logFile, "");
@@ -208,26 +128,6 @@ async function startBot() {
         log(wallet.address, `🔹 Processing wallet: ${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`);
         await sendDailyTask(wallet);
     }
-}
-
-startBot();
-
-// Header display
-function header() {
-    process.stdout.write('\x1Bc');
-    console.log('===================================================='.cyan);
-    console.log('                                                    '.cyan);
-    console.log(' 8888888b.  d8b                        888          '.cyan);
-    console.log(' 888   Y88b Y8P                        888          '.cyan);
-    console.log(' 888    888                            888          '.cyan);
-    console.log(' 888   d88P 888  8888b.  88888b.   .d88888  8888b.  '.cyan);
-    console.log(' 8888888P"  888     "88b 888 "88b d88" 888     "88b '.cyan);
-    console.log(' 888 T88b   888 .d888888 888  888 888  888 .d888888 '.cyan);
-    console.log(' 888  T88b  888 888  888 888  888 Y88b 888 888  888 '.cyan);
-    console.log(' 888   T88b 888 "Y888888 888  888  "Y88888 "Y888888 '.cyan);
-    console.log('                                                    '.cyan);
-    console.log('===================================================='.cyan);
-    console.log();
 }
 
 startBot();
