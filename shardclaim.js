@@ -115,20 +115,7 @@ async function signChallenge(wallet) {
     }
 }
 
-// Main task functions for checking and claiming tasks
-async function sendTaskRequest(accessToken, taskID, address) {
-    log(address, `🔹 Sending request for Task ${taskID}...`);
-    await delay(5000);
-    
-    await fetch("https://legends.saharalabs.ai/api/v1/task/flush", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ taskID, timestamp: Date.now() })
-    });
-
-    log(address, `✅ Task ${taskID} - Request successfully sent.`);
-}
-
+// Main task function for checking and claiming task 1004
 async function sendTaskClaim(accessToken, taskID, address) {
     log(address, `🔹 Claiming Task ${taskID}...`);
     await delay(5000);
@@ -161,10 +148,7 @@ async function sendCheckTask(accessToken, taskID, address) {
     log(address, `✅ Task ${taskID} - Status: ${status}`);
 
     if (status === "1") {
-        log(address, `🔹 Task ${taskID} requires verification, sending request...`);
-        await sendTaskRequest(accessToken, taskID, address);
-        await delay(10000);
-        log(address, `🔹 Task ${taskID} verification completed, claiming reward...`);
+        log(address, `🔹 Task ${taskID} requires verification, claiming reward...`);
         await sendTaskClaim(accessToken, taskID, address);
     } else if (status === "2") {
         log(address, `🔹 Task ${taskID} is claimable, claiming reward...`);
@@ -183,11 +167,9 @@ async function sendDailyTask(wallet) {
             throw new Error(`❌ Access token not found!`);
         }
 
-        const taskIDs = ["1001", "1002", "1004"];
-        for (const taskID of taskIDs) {
-            await sendCheckTask(accessToken, taskID, wallet.address);
-        }
-        log(wallet.address, "✅ All tasks completed.");
+        const taskID = "1004";  // Only task 1004
+        await sendCheckTask(accessToken, taskID, wallet.address);
+        log(wallet.address, "✅ Task completed.");
         log("", "");
     } catch (error) {
         log(wallet.address, `❌ Error: ${error.message}`);
@@ -208,4 +190,3 @@ async function startBot() {
 }
 
 startBot();
-
