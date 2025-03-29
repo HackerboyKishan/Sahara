@@ -167,7 +167,7 @@ async function sendDailyTask(wallet) {
             throw new Error(`❌ Access token not found!`);
         }
 
-        const taskID = "1004";  // Only task 1004
+        const taskID = "4";  // Only task 1004
         await sendCheckTask(accessToken, taskID, wallet.address);
         log(wallet.address, "✅ Task completed.");
         log("", "");
