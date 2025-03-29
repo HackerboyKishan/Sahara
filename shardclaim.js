@@ -115,12 +115,89 @@ async function signChallenge(wallet) {
     }
 }
 
-// Main bot loop
+// Main task functions for checking and claiming tasks
+async function sendTaskRequest(accessToken, taskID, address) {
+    log(address, `🔹 Sending request for Task ${taskID}...`);
+    await delay(5000);
+    
+    await fetch("https://legends.saharalabs.ai/api/v1/task/flush", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
+        body: JSON.stringify({ taskID, timestamp: Date.now() })
+    });
+
+    log(address, `✅ Task ${taskID} - Request successfully sent.`);
+}
+
+async function sendTaskClaim(accessToken, taskID, address) {
+    log(address, `🔹 Claiming Task ${taskID}...`);
+    await delay(5000);
+
+    await fetch("https://legends.saharalabs.ai/api/v1/task/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
+        body: JSON.stringify({ taskID, timestamp: Date.now() })
+    });
+
+    log(address, `✅ Task ${taskID} - Successfully claimed.`);
+}
+
+async function sendCheckTask(accessToken, taskID, address) {
+    log(address, `🔹 Checking Task ${taskID} status...`);
+    await delay(5000);
+
+    const checkTask = await fetch("https://legends.saharalabs.ai/api/v1/task/dataBatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "authorization": `Bearer ${accessToken}` },
+        body: JSON.stringify({ taskIDs: [taskID], timestamp: Date.now() })
+    });
+
+    if (!checkTask.ok) {
+        throw new Error(`❌ Request /task/dataBatch failed for Task ${taskID}`);
+    }
+
+    const taskData = await checkTask.json();
+    const status = taskData[taskID]?.status;
+    log(address, `✅ Task ${taskID} - Status: ${status}`);
+
+    if (status === "1") {
+        log(address, `🔹 Task ${taskID} requires verification, sending request...`);
+        await sendTaskRequest(accessToken, taskID, address);
+        await delay(10000);
+        log(address, `🔹 Task ${taskID} verification completed, claiming reward...`);
+        await sendTaskClaim(accessToken, taskID, address);
+    } else if (status === "2") {
+        log(address, `🔹 Task ${taskID} is claimable, claiming reward...`);
+        await sendTaskClaim(accessToken, taskID, address);
+    } else if (status === "3") {
+        log(address, `✅ Task ${taskID} is already completed.`);
+    } else {
+        log(address, `⚠️ Task ${taskID} has an unknown status: ${status}`);
+    }
+}
+
+async function sendDailyTask(wallet) {
+    try {
+        const { accessToken } = await signChallenge(wallet);
+        if (!accessToken) {
+            throw new Error(`❌ Access token not found!`);
+        }
+
+        const taskIDs = ["1001", "1002", "1004"];
+        for (const taskID of taskIDs) {
+            await sendCheckTask(accessToken, taskID, wallet.address);
+        }
+        log(wallet.address, "✅ All tasks completed.");
+        log("", "");
+    } catch (error) {
+        log(wallet.address, `❌ Error: ${error.message}`);
+    }
+}
+
+// Start bot with private keys
 async function startBot() {
     fs.writeFileSync(logFile, "");
-    header();
-
-    // Load private keys from file
+    // Load private keys from the file
     const privateKeys = fs.readFileSync('privatekeys.txt', 'utf-8').split('\n').map(line => line.trim()).filter(Boolean);
 
     for (const privateKey of privateKeys) {
@@ -131,3 +208,4 @@ async function startBot() {
 }
 
 startBot();
+
