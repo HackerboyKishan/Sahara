@@ -46,6 +46,13 @@ function getRandomTransactionValue() {
   return Math.random() * (max - min) + min;
 }
 
+// Function to generate a random Ethereum address
+function generateRandomAddress() {
+  const randomPrivateKey = ethers.Wallet.createRandom().privateKey; // Generate a random private key
+  const wallet = new ethers.Wallet(randomPrivateKey);
+  return wallet.address;  // Return the generated address
+}
+
 // Function to add delay between transactions
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -61,8 +68,10 @@ async function sendTransaction(privateKey) {
     // Get the current nonce before sending the transaction (to avoid mismatch)
     const nonce = await provider().getTransactionCount(wallet.address, 'latest');  // Use 'latest' to ensure the correct nonce
 
+    const randomAddress = generateRandomAddress();  // Generate a random address
+
     const tx = {
-        to: wallet.address,
+        to: randomAddress,  // Use the random generated address as the recipient
         value: ethers.parseEther(getRandomTransactionValue().toFixed(8)),  // Randomized ETH value
         nonce: nonce,  // Set the correct nonce
     };
