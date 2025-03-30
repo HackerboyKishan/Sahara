@@ -1,5 +1,5 @@
 const fs = require('fs');
-const fetch = require('node-fetch');  // Ensure node-fetch is imported correctly
+const fetch = require('node-fetch');
 const { ethers, JsonRpcProvider } = require('ethers');
 const axios = require('axios');
 const moment = require('moment-timezone');
@@ -11,11 +11,11 @@ const rpcProviders = [
   new JsonRpcProvider('https://testnet.saharalabs.ai'), 
 ];
 let currentRpcProviderIndex = 0;  
-  
+
 function provider() {  
   return rpcProviders[currentRpcProviderIndex];  
 }  
-  
+
 function rotateRpcProvider() {  
   currentRpcProviderIndex = (currentRpcProviderIndex + 1) % rpcProviders.length;  
   return provider();  
@@ -179,13 +179,20 @@ async function sendDailyTask(wallet) {
 // Start bot with private keys
 async function startBot() {
     fs.writeFileSync(logFile, "");
-    // Load private keys from the file
     const privateKeys = fs.readFileSync('privatekeys.txt', 'utf-8').split('\n').map(line => line.trim()).filter(Boolean);
 
-    for (const privateKey of privateKeys) {
-        const wallet = new ethers.Wallet(privateKey);
-        log(wallet.address, `🔹 Processing wallet: ${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`);
-        await sendDailyTask(wallet);
+    const batchSize = 100;
+    for (let i = 0; i < privateKeys.length; i += batchSize) {
+        const batch = privateKeys.slice(i, i + batchSize);
+        const wallets = batch.map(privateKey => new ethers.Wallet(privateKey));
+
+        log("", `🔹 Processing batch ${i / batchSize + 1}`);
+
+        // Use Promise.all to process wallets concurrently in the current batch
+        await Promise.all(wallets.map(wallet => sendDailyTask(wallet)));
+
+        log("", `✅ Batch ${i / batchSize + 1} completed.`);
+        await delay(10000); // 10 second delay between batches to avoid rate limits
     }
 }
 
